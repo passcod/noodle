@@ -8,9 +8,9 @@ edition = "2018"
 argh = "0.1.4"
 async-std = { version = "1.9.0", features = ["attributes"] }
 color-eyre = { version = "0.5.10", default-features = false }
-ipnetwork = "0.17.0"
 pnet = "0.27.2"
 futures = "0.3.13"
+ctrlc = "3.1.8"
 
 [dependencies.rtnetlink]
 version = "0.7.0"

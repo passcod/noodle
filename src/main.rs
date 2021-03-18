@@ -7,11 +7,10 @@ use std::{
 };
 
 use argh::FromArgs;
-use async_std::task::spawn;
+use async_std::{channel, task::{spawn, spawn_blocking}};
 use color_eyre::eyre::{eyre, Result};
-use futures::stream::TryStreamExt;
-use ipnetwork::IpNetwork;
-use pnet::{datalink::interfaces, util::MacAddr};
+use futures::{future::TryFutureExt, stream::TryStreamExt, try_join};
+use pnet::{datalink::{Channel, ChannelType, Config, interfaces, channel as datachannel}, util::MacAddr, ipnetwork::IpNetwork, packet::{arp::{ArpOperations, ArpPacket}, ethernet::EtherTypes}};
 use rtnetlink::{packet::rtnl::address::nlas::Nla, AddressHandle};
 
 /// Claim an IP for an interface via ARP/NDP. If we hear about someone else claiming the IP, stop.
@@ -45,9 +44,13 @@ async fn main() -> Result<()> {
     color_eyre::install()?;
     let args: Args = argh::from_env();
 
-    if let IpNetwork::V6(_) = args.ip {
-        todo!("ipv6/ndp support");
-    }
+    let ethertype = match args.ip {
+        IpNetwork::V4(_) => EtherTypes::Arp,
+        IpNetwork::V6(_) => {
+            todo!("ipv6/ndp support");
+            EtherTypes::Ipv6
+        }
+    };
 
     dbg!(&args);
 
@@ -68,8 +71,43 @@ async fn main() -> Result<()> {
         return Err(eyre!("interface must be up"));
     }
 
+    let (mut tx, mut rx) = match datachannel(&interface, Config {
+        channel_type: ChannelType::Layer3(ethertype.0),
+        promiscuous: true,
+        ..Default::default()
+    })? {
+        Channel::Ethernet(tx, rx) => (tx, rx),
+        _ => unimplemented!("internal: unhandled datachannel type"),
+    };
+
+    let (oconnor, terminator) = channel::bounded(1);
+    ctrlc::set_handler(move || {
+        oconnor.try_send(()).expect("failed to exit, so exiting harder (unclean)");
+    })?;
+
+    // ctrl-c / sig{term,int} handler
+
     // => spawn off: listen for arp on the interface
     // - if there's a arp for our ip but not our mac, stop noodle
+    let listener = spawn_blocking(move || -> Result<()> { loop {
+        match rx.next()? {
+            pkt => {
+                match ethertype {
+                    EtherTypes::Arp => {
+                        let arp = ArpPacket::new(pkt).ok_or(eyre!("arp packet buffer too small"))?;
+                        let op = match arp.get_operation() {
+                            ArpOperations::Reply => "reply",
+                            ArpOperations::Request => "request",
+                            _ => "unk"
+                        };
+                        eprintln!("arp {}: {:?}", op, arp);
+                    }
+                    EtherTypes::Ipv6 => todo!("v6 support"),
+                    _ => unreachable!()
+                }
+            },
+        }
+    } });
 
     let (nlconn, nl, _) = rtnetlink::new_connection()?;
     spawn(nlconn);
@@ -82,6 +120,15 @@ async fn main() -> Result<()> {
         .await?;
 
     // loop: every interval, send arp. start now
+
+    if let Err(err) = try_join!(
+        terminator.recv().map_err(|e| e.into()).and_then(|_| async {
+            Err(eyre!("Ctrl-C received, quitting gracefully")) as Result<()>
+        }),
+        listener
+    ) {
+        eprintln!("{:?}", err);
+    }
 
     eprintln!("removing ip from interface");
     let mut addrlist = nlah.get().execute();
