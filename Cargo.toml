@@ -4,8 +4,8 @@ version = "0.1.0"
 
 authors = ["Félix Saparelli <felix@passcod.name>"]
 license = "Apache 2.0 OR MIT"
-description = "Helper for infra-less load-directing via unsolicited ARP/NDP"
-keywords = ["arp", "ndp", "floating-ip", "failover"]
+description = "Tiny daemon to implement floating IPs with RFC5944 ARP announcements"
+keywords = ["arp", "ndp", "floating-ip", "failover", "gratuitous", "announcement"]
 
 documentation = "https://github.com/passcod/noodle#readme"
 homepage = "https://github.com/passcod/noodle"
@@ -25,6 +25,7 @@ color-eyre = { version = "0.5.10", default-features = false }
 pnet = "0.27.2"
 futures = "0.3.13"
 ctrlc = "3.1.8"
+rand = "0.8.3"
 
 # no publishing on crates.io until this is released
 [dependencies.rtnetlink]

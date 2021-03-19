@@ -20,16 +20,16 @@ Noodle as in pool noodle, because it floats and IPs and... geddit?
 
 The idea is based on [MetalLB](https://metallb.universe.tf/concepts/layer2/).
 
-Basically, we abuse ARP. (And later, NDP for IPv6.)
+Basically, we emit [RFC5944 "gratuitous" ARP announcements](https://tools.ietf.org/html/rfc5944#section-4.6).
 
-Instead of ARP being request-reply "who has 1.2.3.4?" "I do", we send
-"I have 1.2.3.4" and we add 1.2.3.4 to the network interface we do that
-from, so the network stack handles traffic sent to it properly.
+Instead of the usual ARP request-reply "who has 1.2.3.4?" "I do" cycle, we send
+"I have 1.2.3.4" and we add 1.2.3.4 to the network interface we do that from,
+so the network stack handles traffic sent to it properly.
 
-Noodle is the little daemon that does the ARP advertisement like that.
+Noodle is the little daemon that does the ARP announcements like that.
 
-But Noodle also listens for ARP on the interface. If it sees ARP for the
-IP it's claiming for the interface, but with a different MAC address, it
+But Noodle also listens for ARP on the interface. If it sees ARP on the
+interface for the same IP it's announcing, but with a different MAC address, it
 stops and exits!
 
 When it stops, if it's being managed by an active orchestrator or supervisor,
@@ -67,7 +67,7 @@ The old node will be dead. Traffic goes nowhere. Devices on the subnet
 and the router still have the old MAC in the ARP tables.
 
 Orchestrator notices a node is down, and reschedules its workload on the alive
-nodes. Noodle starts, blathers unsolicited ARP over the network, tables get
+nodes. Noodle starts, blathers ARP announcements over the network, tables get
 updated, and traffic starts flowing again.
 
 ### In a split brain situation
@@ -87,7 +87,7 @@ Proceeds mostly the same as failover, but may proceed as crash:
 
 Orchestrator crashes, leaving the underlying containers or applications
 running. Rest of the cluster notices the node is dead and reschedules. The new
-Noodle yells its ARP out, the old Noodle notices ARP that is not coming from
+Noodle yells its announce, the old Noodle notices ARP that is not coming from
 itself, and exits. Traffic moves over to the new node.
 
 ## Bad times
@@ -111,7 +111,7 @@ take a hit.
 
 Noodle crashes in the middle of its loops and doesn't clean up the IP on
 its interface. Linux responds to ARP requests with solicited "it's me!"
-while other Noodle is screaming out "it's me it's me it's me" unsolicited.
+while other Noodle is screaming out "it's me it's me it's me" announces.
 
 Traffic and routers get confused.
 
@@ -161,6 +161,8 @@ Proceeds like partial split brain except both nodes are technically legitimate.
 
 Only works on Linux.
 
+Currently only ARP (supporting IPv4) is implemented.
+
 ### From binary release
 
 The [release tab on GitHub](https://github.com/passcod/noodle/releases).
@@ -189,24 +191,25 @@ noodle --ip 10.9.8.7/24 --interface ens123
 
 Mandatory options:
 
-- `--ip=IP/SUBNET`: the floating IP to claim.
-- `--interface=NAME`: which interface to blast ARP/NDP on.
+- `--ip=IP/SUBNET`: the floating IP to announce.
+- `--interface=NAME`: which interface to announce ARP on.
 
 Other options:
 
 - `--mac=ADDRESS`: override the MAC address (default=read from interface)
 - `--log=LEVEL`: specify the log level (default=info). All logs are JSON.
-- `--interval=DURATION` in seconds (default=10): how often to blast.
-- `--delay=DURATION` in seconds (default=0): delay the first blast.
+- `--interval=DURATION` in seconds (default=10): how often to announce.
+- `--delay=DURATION` in seconds (default=0): delay the first announce.
 - `--jitter=DURATION` in seconds (default=2): add jitter to each delay and
   interval that's a random value between zero and this value.
-- `--watch=BEHAVIOUR`: control the advertisement watcher:
-  * `fail` (default): exit with status 17 if we see an advertisement for this
+- `--arp-reply`: use ARP reply instead of ARP request as announcement type
+- `--watch=BEHAVIOUR`: control the competing announcement watcher:
+  * `fail` (default): exit with status 17 if we see an announcement for this
     IP by another MAC address
   * `quit`: exit with status 0 instead
   * `log`: don't exit, only log it
   * `no`: don't watch
-- `--count=N` (default=0/disabled): only blast this many times.
+- `--count=N` (default=0/disabled): only announce this many times.
 - `--once`: shorthand for `--count=1 --delay=0 --jitter=0 --watch=no`.
 
 Info switches:

@@ -11,7 +11,7 @@ use std::{
 use argh::FromArgs;
 use async_std::{
 	channel,
-	task::{spawn, spawn_blocking},
+	task::{sleep, spawn, spawn_blocking},
 };
 use color_eyre::eyre::{eyre, Result};
 use futures::{future::TryFutureExt, stream::TryStreamExt, try_join};
@@ -19,27 +19,29 @@ use pnet::{
 	datalink::{channel as datachannel, interfaces, Channel, ChannelType, Config},
 	ipnetwork::IpNetwork,
 	packet::{
+		Packet,
 		arp::{ArpOperations, ArpPacket},
 		ethernet::EtherTypes,
 	},
 	util::MacAddr,
 };
+use rand::{rngs::OsRng, Rng};
 use rtnetlink::{packet::rtnl::address::nlas::Nla, AddressHandle};
 
 const SOURCE_MAIN: &'static str = include_str!("main.rs");
-const SOURCE_CARGO : &'static str= include_str!("../Cargo.toml");
-const README : &'static str= include_str!("../README.md");
+const SOURCE_CARGO: &'static str = include_str!("../Cargo.toml");
+const README: &'static str = include_str!("../README.md");
 
-/// Claim an IP for an interface via ARP/NDP.
-/// If we hear about someone else claiming the IP, stop.
+/// Announce an IP for an interface via ARP.
+/// If we hear someone else announcing the IP, stop.
 /// See more details in README. License: Apache 2.0 OR MIT.
 #[derive(Debug, FromArgs)]
 struct Args {
-	/// interface to claim on (required)
+	/// interface to announce on (required)
 	#[argh(option)]
 	interface: Option<String>,
 
-	/// ip (optionally with subnet, defaults to /32) to claim (required)
+	/// ip (optionally with subnet, defaults to /32) to announce (required)
 	#[argh(option)]
 	ip: Option<IpNetwork>,
 
@@ -53,11 +55,11 @@ struct Args {
 	#[argh(option, default = "Default::default()")]
 	log: LogLevel,
 
-	/// interval in seconds to send claims (default=10)
+	/// interval in seconds between announcements (default=10)
 	#[argh(option, from_str_fn(str_to_secs), default = "Duration::from_secs(10)")]
 	interval: Duration,
 
-	/// delay in seconds before sending first claim (default=0/disabled)
+	/// delay in seconds before sending first announce (default=0/disabled)
 	#[argh(option, from_str_fn(str_to_secs), default = "Duration::from_secs(0)")]
 	delay: Duration,
 
@@ -65,11 +67,12 @@ struct Args {
 	#[argh(option, from_str_fn(str_to_secs), default = "Duration::from_secs(2)")]
 	jitter: Duration,
 
-	/// blast advertisements this many times then stop (default=0/disabled)
+	/// announce this many times then stop (default=0/disabled)
 	#[argh(option, default = "0")]
 	count: usize,
 
-	/// control the advertisement watcher (default=fail)
+	/// control what the competing announcement watcher does when it sees ARP for the same IP but
+	/// from a different MAC (default=fail)
 	///
 	/// [fail: exit with code=17]
 	/// [quit: exit with code=0]
@@ -77,6 +80,10 @@ struct Args {
 	/// [no: don't watch]
 	#[argh(option, default = "Default::default()")]
 	watch: Watch,
+
+	/// use arp reply instead of request announcements
+	#[argh(switch)]
+	arp_reply: bool,
 
 	/// shorthand for `--delay=0 --jitter=0 --count=1 --watch=no`
 	#[argh(switch)]
@@ -124,7 +131,7 @@ impl FromStr for Watch {
 			"quit" => Ok(Self::Quit),
 			"log" => Ok(Self::Log),
 			"no" => Ok(Self::No),
-			_ => Err(String::from("invalid --watch value"))
+			_ => Err(String::from("invalid --watch value")),
 		}
 	}
 }
@@ -156,9 +163,18 @@ impl FromStr for LogLevel {
 			"info" => Ok(Self::Info),
 			"debug" | "verbose" => Ok(Self::Debug),
 			"trace" => Ok(Self::Trace),
-			_ => Err(String::from("invalid --log value"))
+			_ => Err(String::from("invalid --log value")),
 		}
 	}
+}
+
+async fn wait(base: Duration, jitter: Duration) {
+	sleep(
+		base + Duration::from_millis(
+			OsRng::default().gen_range(0..u64::try_from(jitter.as_millis()).unwrap()),
+		),
+	)
+	.await;
 }
 
 #[async_std::main]
@@ -168,7 +184,10 @@ async fn main() -> Result<()> {
 		let mut args: Args = argh::from_env();
 
 		if args.source {
-			println!("# Cargo.toml\n{}\n\n# src/main.rs\n{}", SOURCE_CARGO, SOURCE_MAIN);
+			println!(
+				"# Cargo.toml\n{}\n\n# src/main.rs\n{}",
+				SOURCE_CARGO, SOURCE_MAIN
+			);
 			return Ok(());
 		}
 
@@ -257,7 +276,7 @@ async fn main() -> Result<()> {
 							ArpOperations::Request => "request",
 							_ => "unk",
 						};
-						eprintln!("arp {}: {:?}", op, arp);
+						eprintln!("arp {}: {:?} + {:?}", op, arp, arp.payload());
 					}
 					EtherTypes::Ipv6 => todo!("v6 support"),
 					_ => unreachable!(),
@@ -277,12 +296,21 @@ async fn main() -> Result<()> {
 		.await?;
 
 	// loop: every interval, send arp. start now
+	let blaster = spawn(async move {
+		if false { return Ok(()) as Result<()>; }
+		wait(args.delay, args.jitter).await;
+		loop {
+			println!("blast");
+			wait(args.interval, args.jitter).await;
+		}
+	});
 
 	if let Err(err) = try_join!(
 		terminator.recv().map_err(|e| e.into()).and_then(|_| async {
 			Err(eyre!("Ctrl-C received, quitting gracefully")) as Result<()>
 		}),
-		listener
+		listener,
+		blaster,
 	) {
 		eprintln!("{:?}", err);
 	}
