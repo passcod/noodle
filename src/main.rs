@@ -438,6 +438,7 @@ async fn main() -> Result<()> {
 					eth.set_payload(arp.packet_mut());
 
 					info!("sending arp packet", {
+						n: n,
 						src: as_display!(mac),
 						dst: as_display!(broadcast),
 						op: if args.arp_reply { "reply" } else { "request" },
