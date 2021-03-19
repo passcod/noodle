@@ -434,6 +434,7 @@ async fn main() -> Result<()> {
 					let broadcast = MacAddr::broadcast();
 					eth.set_source(mac);
 					eth.set_destination(broadcast);
+					eth.set_ethertype(EtherTypes::Arp);
 					eth.set_payload(arp.packet_mut());
 
 					info!("sending arp packet", {
