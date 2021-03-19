@@ -208,3 +208,10 @@ Other options:
   * `no`: don't watch
 - `--count=N` (default=0/disabled): only blast this many times.
 - `--once`: shorthand for `--count=1 --delay=0 --jitter=0 --watch=no`.
+
+Info switches:
+
+- `--help`: print the help.
+- `--readme`: print this readme.
+- `--source`: print the source (Cargo.toml and main.rs).
+- `--version`: print the version number.
