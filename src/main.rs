@@ -2,7 +2,7 @@
 
 use std::{
 	convert::TryFrom,
-	net::{Ipv4Addr, Ipv6Addr},
+	net::{IpAddr, Ipv4Addr, Ipv6Addr},
 	result::Result as StdResult,
 	str::FromStr,
 	time::Duration,
@@ -19,9 +19,9 @@ use pnet::{
 	datalink::{channel as datachannel, interfaces, Channel, ChannelType, Config},
 	ipnetwork::IpNetwork,
 	packet::{
-		Packet,
-		arp::{ArpOperations, ArpPacket},
+		arp::{ArpHardwareTypes, ArpOperations, ArpPacket, MutableArpPacket},
 		ethernet::EtherTypes,
+		Packet,
 	},
 	util::MacAddr,
 };
@@ -169,12 +169,18 @@ impl FromStr for LogLevel {
 }
 
 async fn wait(base: Duration, jitter: Duration) {
-	sleep(
-		base + Duration::from_millis(
-			OsRng::default().gen_range(0..u64::try_from(jitter.as_millis()).unwrap()),
-		),
-	)
-	.await;
+	match (base.as_secs(), jitter.as_secs()) {
+		(0, 0) => {}
+		(_, 0) => sleep(base).await,
+		_ => {
+			sleep(
+				base + Duration::from_millis(
+					OsRng::default().gen_range(0..u64::try_from(jitter.as_millis()).unwrap()),
+				),
+			)
+			.await
+		}
+	}
 }
 
 #[async_std::main]
@@ -220,6 +226,7 @@ async fn main() -> Result<()> {
 		IpNetwork::V4(_) => EtherTypes::Arp,
 		IpNetwork::V6(_) => {
 			todo!("ipv6/ndp support");
+			#[allow(unreachable_code)]
 			EtherTypes::Ipv6
 		}
 	};
@@ -228,9 +235,6 @@ async fn main() -> Result<()> {
 		.into_iter()
 		.find(|i| i.name == iface)
 		.ok_or(eyre!("interface does not exist"))?;
-	if interface.mac.is_none() {
-		return Err(eyre!("interface does not have a mac address"));
-	}
 	if interface.is_loopback() {
 		return Err(eyre!("cannot use loopback interface"));
 	}
@@ -240,6 +244,11 @@ async fn main() -> Result<()> {
 	if !interface.is_up() {
 		return Err(eyre!("interface must be up"));
 	}
+
+	let mac = args
+		.mac
+		.or(interface.mac)
+		.ok_or(eyre!("interface does not have a mac address"))?;
 
 	let (mut tx, mut rx) = match datachannel(
 		&interface,
@@ -264,7 +273,12 @@ async fn main() -> Result<()> {
 
 	// => spawn off: listen for arp on the interface
 	// - if there's a arp for our ip but not our mac, stop noodle
+	let watch = args.watch;
 	let listener = spawn_blocking(move || -> Result<()> {
+		if let Watch::No = watch {
+			return Ok(());
+		}
+
 		loop {
 			match rx.next()? {
 				pkt => match ethertype {
@@ -276,7 +290,7 @@ async fn main() -> Result<()> {
 							ArpOperations::Request => "request",
 							_ => "unk",
 						};
-						eprintln!("arp {}: {:?} + {:?}", op, arp, arp.payload());
+						eprintln!("arp {}: {:?}", op, arp);
 					}
 					EtherTypes::Ipv6 => todo!("v6 support"),
 					_ => unreachable!(),
@@ -295,23 +309,61 @@ async fn main() -> Result<()> {
 		.execute()
 		.await?;
 
-	// loop: every interval, send arp. start now
 	let blaster = spawn(async move {
-		if false { return Ok(()) as Result<()>; }
+		if false {
+			return Ok(()) as Result<()>;
+		}
 		wait(args.delay, args.jitter).await;
+
+		let mut n = 0_usize;
 		loop {
-			println!("blast");
+			let mut buf = vec![0_u8; MutableArpPacket::minimum_packet_size()];
+			let mut arp =
+				MutableArpPacket::new(&mut buf[..]).ok_or(eyre!("failed to create arp packet"))?;
+
+			let ip4 = match ip.ip() {
+				IpAddr::V4(i) => i,
+				_ => todo!("ipv6 support"),
+			};
+
+			arp.set_protocol_type(EtherTypes::Ipv4);
+			arp.set_hardware_type(ArpHardwareTypes::Ethernet);
+			arp.set_hw_addr_len(6);
+			arp.set_proto_addr_len(4);
+			arp.set_sender_hw_addr(mac);
+			arp.set_target_hw_addr(mac);
+			arp.set_sender_proto_addr(ip4);
+			arp.set_target_proto_addr(ip4);
+			arp.set_operation(if args.arp_reply {
+				ArpOperations::Reply
+			} else {
+				ArpOperations::Request
+			});
+
+			// this isn't async but should be fast compared to the wait
+			tx.send_to(arp.packet(), None).transpose()?;
+
+			n = n.saturating_add(1);
+			if args.count > 0 && n >= args.count {
+				return Ok(());
+			}
+
 			wait(args.interval, args.jitter).await;
 		}
 	});
 
-	if let Err(err) = try_join!(
-		terminator.recv().map_err(|e| e.into()).and_then(|_| async {
-			Err(eyre!("Ctrl-C received, quitting gracefully")) as Result<()>
-		}),
-		listener,
-		blaster,
-	) {
+	if let Err(err) = if let Watch::No = watch {
+		try_join!(blaster).map(|_| ())
+	} else {
+		try_join!(
+			terminator.recv().map_err(|e| e.into()).and_then(|_| async {
+				Err(eyre!("Ctrl-C received, quitting gracefully")) as Result<()>
+			}),
+			listener,
+			blaster,
+		)
+		.map(|_| ())
+	} {
 		eprintln!("{:?}", err);
 	}
 
