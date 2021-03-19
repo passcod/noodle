@@ -26,6 +26,9 @@ pnet = "0.27.2"
 futures = "0.3.13"
 ctrlc = "3.1.8"
 rand = "0.8.3"
+log = "0.4.14"
+femme = "2.1.1"
+kv-log-macro = "1.0.7"
 
 # no publishing on crates.io until this is released
 [dependencies.rtnetlink]

@@ -203,6 +203,7 @@ Other options:
 - `--jitter=DURATION` in seconds (default=2): add jitter to each delay and
   interval that's a random value between zero and this value.
 - `--arp-reply`: use ARP reply instead of ARP request as announcement type
+- `--unmanaged-ip`: leave the interface alone (don't add/remove the ip)
 - `--watch=BEHAVIOUR`: control the competing announcement watcher:
   * `fail` (default): exit with status 17 if we see an announcement for this
     IP by another MAC address
