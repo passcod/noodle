@@ -1,8 +1,22 @@
 [package]
-name = "noodle"
+name = "passcod-noodle"
 version = "0.1.0"
+
 authors = ["Félix Saparelli <felix@passcod.name>"]
+license = "Apache 2.0 OR MIT"
+description = "Helper for infra-less load-directing via unsolicited ARP/NDP"
+keywords = ["arp", "ndp", "floating-ip", "failover"]
+
+documentation = "https://github.com/passcod/noodle#readme"
+homepage = "https://github.com/passcod/noodle"
+repository = "https://github.com/passcod/noodle"
+
 edition = "2018"
+default-run = "noodle"
+
+[[bin]]
+name = "noodle"
+path = "src/main.rs"
 
 [dependencies]
 argh = "0.1.4"
@@ -12,6 +26,7 @@ pnet = "0.27.2"
 futures = "0.3.13"
 ctrlc = "3.1.8"
 
+# no publishing on crates.io until this is released
 [dependencies.rtnetlink]
 version = "0.7.0"
 git = "https://github.com/little-dude/netlink"
@@ -20,3 +35,13 @@ features = ["smol_socket"]
 
 [profile.dev.package.backtrace]
 opt-level = 3
+
+[profile.release]
+lto = true
+codegen-units = 1
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-v{ version }-{ target }.tar.xz"
+bin-dir = "{ name }-v{ version }-{ target }/{ bin }{ format }"
+pkg-fmt = "txz"
+
