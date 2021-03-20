@@ -29,8 +29,8 @@ jobs:
         run: |
           set -eux
           bin="target/${{ matrix.target }}/release/noodle"
-          version=$("$bin" --version)
-          dst="noodle-v${version}-${{ matrix.target }}"
+          version=$(echo "${{ github.ref }}" | cut -d/ -f3)
+          dst="noodle-${version}-${{ matrix.target }}"
           mkdir "$dst"
           strip "$bin"
           mv "$bin" "$dst/"
