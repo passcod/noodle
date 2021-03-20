@@ -62,6 +62,10 @@ struct Args {
 	#[argh(option)]
 	mac: Option<MacAddr>,
 
+	/// target mac override (default=broadcast)
+	#[argh(option, default = "MacAddr::broadcast()")]
+	target: MacAddr,
+
 	/// log level (default=info)
 	///
 	/// [no, error, warn, info, debug, trace]
@@ -76,8 +80,8 @@ struct Args {
 	#[argh(option, from_str_fn(str_to_secs), default = "Duration::from_secs(0)")]
 	delay: Duration,
 
-	/// add some random [0 - value in seconds] jitter to delay and interval (default=2)
-	#[argh(option, from_str_fn(str_to_secs), default = "Duration::from_secs(2)")]
+	/// add some random [0 - value in seconds] jitter to delay and interval (default=1)
+	#[argh(option, from_str_fn(str_to_secs), default = "Duration::from_secs(1)")]
 	jitter: Duration,
 
 	/// announce this many times then stop (default=0/disabled)
@@ -433,7 +437,7 @@ async fn main() -> Result<()> {
 
 					let broadcast = MacAddr::broadcast();
 					eth.set_source(mac);
-					eth.set_destination(broadcast);
+					eth.set_destination(args.target);
 					eth.set_ethertype(EtherTypes::Arp);
 					eth.set_payload(arp.packet_mut());
 

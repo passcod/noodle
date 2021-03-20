@@ -196,7 +196,8 @@ Mandatory options:
 
 Other options:
 
-- `--mac=ADDRESS`: override the MAC address (default=read from interface)
+- `--mac=ADDRESS`: override the MAC address IP is announced for (default=read from interface)
+- `--target=ADDRESS`: override the MAC address packets are sent to (default=broadcast)
 - `--log=LEVEL`: specify the log level (default=info). All logs are JSON.
 - `--interval=DURATION` in seconds (default=10): how often to announce.
 - `--delay=DURATION` in seconds (default=0): delay the first announce.
