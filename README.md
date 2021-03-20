@@ -191,28 +191,28 @@ noodle --ip 10.9.8.7/24 --interface ens123
 
 Mandatory options:
 
-- `--ip=IP/SUBNET`: the floating IP to announce.
-- `--interface=NAME`: which interface to announce ARP on.
+- `--ip IP/SUBNET`: the floating IP to announce.
+- `--interface NAME`: which interface to announce ARP on.
 
 Other options:
 
-- `--mac=ADDRESS`: override the MAC address IP is announced for (default=read from interface)
-- `--target=ADDRESS`: override the MAC address packets are sent to (default=broadcast)
-- `--log=LEVEL`: specify the log level (default=info). All logs are JSON.
-- `--interval=DURATION` in seconds (default=10): how often to announce.
-- `--delay=DURATION` in seconds (default=0): delay the first announce.
-- `--jitter=DURATION` in seconds (default=2): add jitter to each delay and
+- `--mac ADDRESS`: override the MAC address IP is announced for (default=read from interface)
+- `--target ADDRESS`: override the MAC address packets are sent to (default=broadcast)
+- `--log LEVEL`: specify the log level (default=info). All logs are JSON.
+- `--interval DURATION` in seconds (default=10): how often to announce.
+- `--delay DURATION` in seconds (default=0): delay the first announce.
+- `--jitter DURATION` in seconds (default=2): add jitter to each delay and
   interval that's a random value between zero and this value.
 - `--arp-reply`: use ARP reply instead of ARP request as announcement type
 - `--unmanaged-ip`: leave the interface alone (don't add/remove the ip)
-- `--watch=BEHAVIOUR`: control the competing announcement watcher:
+- `--watch BEHAVIOUR`: control the competing announcement watcher:
   * `fail` (default): exit with status 17 if we see an announcement for this
     IP by another MAC address
   * `quit`: exit with status 0 instead
   * `log`: don't exit, only log it
   * `no`: don't watch
-- `--count=N` (default=0/disabled): only announce this many times.
-- `--once`: shorthand for `--count=1 --delay=0 --jitter=0 --watch=no`.
+- `--count N` (default=0/disabled): only announce this many times.
+- `--once`: shorthand for `--count 1  --delay 0  --jitter 0  --watch no`.
 
 Info switches:
 
