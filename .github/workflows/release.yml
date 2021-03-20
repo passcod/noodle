@@ -36,7 +36,7 @@ jobs:
           version=$(echo "${{ github.ref }}" | cut -d/ -f3)
           dst="noodle-${version}-${{ matrix.target }}"
           mkdir "$dst"
-          strip "$bin"
+          strip "$bin" || true
           mv "$bin" "$dst/"
           mv README.md COPYRIGHT LICENSE-MIT LICENSE-APACHE "$dst/"
           tar cavf "$dst.tar.xz" "$dst"
