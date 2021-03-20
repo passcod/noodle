@@ -52,3 +52,7 @@ pkg-url = "{ repo }/releases/download/v{ version }/{ name }-v{ version }-{ targe
 bin-dir = "{ name }-v{ version }-{ target }/{ bin }{ format }"
 pkg-fmt = "txz"
 
+# waits on next libc after 0.2.90, for https://github.com/rust-lang/libc/pull/2119
+[patch.crates-io.libc]
+git = "https://github.com/rust-lang/libc"
+
