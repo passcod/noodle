@@ -1,6 +1,6 @@
 # Changelog
 
-## next
+## v1.0.1 (2021-03-21)
 
 - Handle runtime (as opposed to startup time) errors with logging rather than eyre.
 - Remove readme mention of error code 17 (was never true).
