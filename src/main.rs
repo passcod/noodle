@@ -41,9 +41,9 @@ macro_rules! as_display {
 	};
 }
 
-const SOURCE_MAIN: &'static str = include_str!("main.rs");
-const SOURCE_CARGO: &'static str = include_str!("../Cargo.toml");
-const README: &'static str = include_str!("../README.md");
+const SOURCE_MAIN: &str = include_str!("main.rs");
+const SOURCE_CARGO: &str = include_str!("../Cargo.toml");
+const README: &str = include_str!("../README.md");
 
 /// Announce an IP for an interface via ARP.
 /// If we hear someone else announcing the IP, stop.
@@ -261,7 +261,7 @@ async fn main() -> Result<()> {
 			warn!("interval > 24h is probably a mistake");
 		}
 
-		match (args.ip.clone(), args.interface.clone()) {
+		match (args.ip, args.interface.clone()) {
 			(Some(ip), Some(iface)) => (ip, iface, !args.unmanaged_ip, args),
 			(Some(_), None) => return Err(eyre!("missing required option: --interface")),
 			(None, Some(_)) => return Err(eyre!("missing required option: --ip")),
@@ -272,7 +272,7 @@ async fn main() -> Result<()> {
 	let interface = interfaces()
 		.into_iter()
 		.find(|i| i.name == iface)
-		.ok_or(eyre!("interface does not exist"))?;
+		.ok_or_else(|| eyre!("interface does not exist"))?;
 	if interface.is_loopback() {
 		return Err(eyre!("cannot use loopback interface"));
 	}
@@ -286,7 +286,7 @@ async fn main() -> Result<()> {
 	let mac = args
 		.mac
 		.or(interface.mac)
-		.ok_or(eyre!("interface does not have a mac address"))?;
+		.ok_or_else(|| eyre!("interface does not have a mac address"))?;
 
 	let (mut tx, mut rx) = match datachannel(
 		&interface,
@@ -334,13 +334,13 @@ async fn main() -> Result<()> {
 				loop {
 					let pkt = rx.next()?;
 					let eth =
-						EthernetPacket::new(pkt).ok_or(eyre!("eth packet buffer too small"))?;
+						EthernetPacket::new(pkt).ok_or_else(|| eyre!("eth packet buffer too small"))?;
 					if eth.get_ethertype() != EtherTypes::Arp {
 						continue;
 					}
 
 					let pay = eth.payload();
-					let arp = ArpPacket::new(pay).ok_or(eyre!("arp packet buffer too small"))?;
+					let arp = ArpPacket::new(pay).ok_or_else(|| eyre!("arp packet buffer too small"))?;
 
 					let op = match arp.get_operation() {
 						ArpOperations::Reply => String::from("reply"),
@@ -406,7 +406,7 @@ async fn main() -> Result<()> {
 				loop {
 					let mut arp_buf = vec![0_u8; MutableArpPacket::minimum_packet_size()];
 					let mut arp = MutableArpPacket::new(&mut arp_buf[..])
-						.ok_or(eyre!("failed to create arp packet"))?;
+						.ok_or_else(|| eyre!("failed to create arp packet"))?;
 
 					let ip4 = match ip.ip() {
 						IpAddr::V4(i) => i,
@@ -433,7 +433,7 @@ async fn main() -> Result<()> {
 							+ MutableArpPacket::minimum_packet_size()
 					];
 					let mut eth = MutableEthernetPacket::new(&mut eth_buf)
-						.ok_or(eyre!("failed to create eth packet"))?;
+						.ok_or_else(|| eyre!("failed to create eth packet"))?;
 
 					eth.set_source(mac);
 					eth.set_destination(args.target);
@@ -452,7 +452,7 @@ async fn main() -> Result<()> {
 					});
 					tx.send_to(eth.packet(), None)
 						.transpose()?
-						.ok_or(eyre!("unknown error sending packet"))?;
+						.ok_or_else(|| eyre!("unknown error sending packet"))?;
 
 					n = n.saturating_add(1);
 					if args.count > 0 && n >= args.count {
