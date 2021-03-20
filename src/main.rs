@@ -13,14 +13,16 @@ use argh::FromArgs;
 use async_std::{
 	channel,
 	prelude::FutureExt,
-	task::{spawn, spawn_blocking},
+	task::{block_on, spawn, spawn_blocking},
 };
 use color_eyre::eyre::{eyre, Result};
 use femme::LevelFilter;
 use futures::{stream::TryStreamExt, TryFutureExt};
-use kv_log_macro::{debug, info, warn};
+use kv_log_macro::{debug, error, info, warn};
 use pnet::{
-	datalink::{channel as datachannel, interfaces, Channel, ChannelType, Config},
+	datalink::{
+		channel as datachannel, interfaces, Channel, ChannelType, Config, NetworkInterface,
+	},
 	ipnetwork::IpNetwork,
 	packet::{
 		arp::{
@@ -217,10 +219,32 @@ fn wait(base: Duration, jitter: Duration) {
 	}
 }
 
-#[async_std::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
+	// panics+prep errors get color-eyre'd, run errors get logged
 	color_eyre::install()?;
-	let (ip, iface, ip_managed, args) = {
+
+	if let Some(p) = prep()? {
+		debug!("arguments", {
+			ip: &p.0.to_string(),
+			interface: &p.1.to_string(),
+			mac: &p.2.to_string(),
+			ip_managed: p.3,
+			args: &format!("{:?}", p.4),
+		});
+
+		if let Err(e) = block_on(run(p)) {
+			error!("{}", e);
+			exit(1);
+		}
+	}
+
+	Ok(())
+}
+
+type Prep = (IpNetwork, NetworkInterface, MacAddr, bool, Args);
+
+fn prep() -> Result<Option<Prep>> {
+	let (ip, args) = {
 		let mut args: Args = argh::from_env();
 		femme::with_level(args.log.into());
 
@@ -229,17 +253,17 @@ async fn main() -> Result<()> {
 				"# Cargo.toml\n{}\n\n# src/main.rs\n{}",
 				SOURCE_CARGO, SOURCE_MAIN
 			);
-			return Ok(());
+			return Ok(None);
 		}
 
 		if args.readme {
 			println!("{}", README);
-			return Ok(());
+			return Ok(None);
 		}
 
 		if args.version {
 			println!("{}", env!("CARGO_PKG_VERSION"));
-			return Ok(());
+			return Ok(None);
 		}
 
 		if args.once {
@@ -261,8 +285,8 @@ async fn main() -> Result<()> {
 			warn!("interval > 24h is probably a mistake");
 		}
 
-		match (args.ip, args.interface.clone()) {
-			(Some(ip), Some(iface)) => (ip, iface, !args.unmanaged_ip, args),
+		match (args.ip, &args.interface) {
+			(Some(ip), Some(_)) => (ip, args),
 			(Some(_), None) => return Err(eyre!("missing required option: --interface")),
 			(None, Some(_)) => return Err(eyre!("missing required option: --ip")),
 			(None, None) => return Err(eyre!("missing required options: --interface, --ip")),
@@ -271,7 +295,7 @@ async fn main() -> Result<()> {
 
 	let interface = interfaces()
 		.into_iter()
-		.find(|i| i.name == iface)
+		.find(|i| Some(&i.name) == args.interface.as_ref())
 		.ok_or_else(|| eyre!("interface does not exist"))?;
 	if interface.is_loopback() {
 		return Err(eyre!("cannot use loopback interface"));
@@ -288,6 +312,10 @@ async fn main() -> Result<()> {
 		.or(interface.mac)
 		.ok_or_else(|| eyre!("interface does not have a mac address"))?;
 
+	Ok(Some((ip, interface, mac, !args.unmanaged_ip, args)))
+}
+
+async fn run((ip, interface, mac, ip_managed, args): Prep) -> Result<()> {
 	let (mut tx, mut rx) = match datachannel(
 		&interface,
 		Config {

@@ -220,7 +220,7 @@ Other options:
 - `--arp-reply`: use ARP reply instead of ARP request as announcement type
 - `--unmanaged-ip`: leave the interface alone (don't add/remove the ip)
 - `--watch BEHAVIOUR`: control the competing announcement watcher:
-  * `fail` (default): exit with status 17 if we see an announcement for this
+  * `fail` (default): exit with status 1 if we see an announcement for this
     IP by another MAC address
   * `quit`: exit with status 0 instead
   * `log`: don't exit, only log it
