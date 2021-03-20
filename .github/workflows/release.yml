@@ -22,7 +22,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         name: Build
         with:
-          use_cross: ${{ ! startsWith(matrix.target, 'x86_64-unknown-linux') }}
+          use_cross: true
           command: build
           args: --release --target ${{ matrix.target }}
       - name: Package
