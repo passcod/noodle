@@ -17,7 +17,6 @@ jobs:
           - aarch64-unknown-linux-musl
           - armv7-unknown-linux-gnueabihf
           - armv7-unknown-linux-musleabihf
-          - riscv32gc-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -42,6 +41,6 @@ jobs:
           tar cavf "$dst.tar.xz" "$dst"
       - uses: softprops/action-gh-release@v1
         with:
-          files: *.tar.xz
+          files: noodle-*.tar.xz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

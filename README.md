@@ -167,13 +167,25 @@ Currently only ARP (supporting IPv4) is implemented.
 
 The [release tab on GitHub](https://github.com/passcod/noodle/releases).
 
-### With cargo binstall
+Builds are available for:
+
+- x86-64, both gnu and musl
+- AArch64, both gnu and musl
+- Arm7 HF, both gnu and musl
+
+It's trivial to add more, so please ask.
+
+### ~~With cargo binstall~~
+
+⚠  Not available yet, depends on [netlink#149](https://github.com/little-dude/netlink/issues/149)
 
 ```
 cargo binstall passcod-noodle
 ```
 
-### From source
+### ~~From source~~
+
+⚠  Not available yet, depends on [netlink#149](https://github.com/little-dude/netlink/issues/149)
 
 ```
 cargo install passcod-noodle
@@ -182,6 +194,8 @@ cargo install passcod-noodle
 You can also compile from the repo as usual.
 
 ## Use
+
+Requires sudo or the correct capability (TBC).
 
 Minimal command:
 
