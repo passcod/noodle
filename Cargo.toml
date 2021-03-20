@@ -21,13 +21,17 @@ path = "src/main.rs"
 [dependencies]
 argh = "0.1.4"
 async-std = { version = "1.9.0", features = ["attributes"] }
+chrono = "0.4.19"
 color-eyre = { version = "0.5.10", default-features = false }
 ctrlc = "3.1.8"
-femme = "2.1.1"
+env_logger = "0.8.3"
 futures = "0.3.13"
 kv-log-macro = "1.0.7"
+log = { version = "0.4.14", features = ["kv_unstable_serde"] }
 pnet = "0.27.2"
 rand = "0.8.3"
+serde = { version = "1.0.124", features = ["derive"] }
+serde_json = "1.0.64"
 
 # waits on: https://github.com/little-dude/netlink/issues/149
 [dependencies.rtnetlink]

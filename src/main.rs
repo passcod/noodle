@@ -2,7 +2,9 @@
 
 use std::{
 	convert::TryFrom,
+	io::Write,
 	net::{IpAddr, Ipv4Addr, Ipv6Addr},
+	process::exit,
 	result::Result as StdResult,
 	str::FromStr,
 	thread::sleep,
@@ -15,10 +17,12 @@ use async_std::{
 	prelude::FutureExt,
 	task::{block_on, spawn, spawn_blocking},
 };
+use chrono::{SecondsFormat, Utc};
 use color_eyre::eyre::{eyre, Result};
-use femme::LevelFilter;
+use env_logger::{Builder as LogBuilder, Target as LogTarget};
 use futures::{stream::TryStreamExt, TryFutureExt};
 use kv_log_macro::{debug, error, info, warn};
+use log::{kv, LevelFilter};
 use pnet::{
 	datalink::{
 		channel as datachannel, interfaces, Channel, ChannelType, Config, NetworkInterface,
@@ -36,6 +40,7 @@ use pnet::{
 };
 use rand::{rngs::OsRng, Rng};
 use rtnetlink::{packet::rtnl::address::nlas::Nla, AddressHandle};
+use serde::Serialize;
 
 macro_rules! as_display {
 	($e:expr) => {
@@ -191,16 +196,64 @@ impl FromStr for LogLevel {
 	}
 }
 
-impl From<LogLevel> for LevelFilter {
-	fn from(ll: LogLevel) -> Self {
-		match ll {
-			LogLevel::No => Self::Off,
-			LogLevel::Error => Self::Error,
-			LogLevel::Warn => Self::Warn,
-			LogLevel::Info => Self::Info,
-			LogLevel::Debug => Self::Debug,
-			LogLevel::Trace => Self::Trace,
+impl LogLevel {
+	fn install(self) -> Result<()> {
+		if let Self::No = self {
+			return Ok(());
 		}
+
+		let mut log = LogBuilder::new();
+		log.target(LogTarget::Stdout);
+
+		if let Self::Trace = self {
+			log.filter(None, LevelFilter::Trace);
+		} else {
+			log.filter(
+				Some("noodle"),
+				match self {
+					Self::Error => LevelFilter::Error,
+					Self::Warn => LevelFilter::Warn,
+					Self::Info => LevelFilter::Info,
+					Self::Debug => LevelFilter::Debug,
+					_ => unreachable!(),
+				},
+			);
+		}
+
+		#[derive(Serialize)]
+		struct Record<'kv> {
+			level: &'static str,
+			#[serde(skip_serializing_if = "Option::is_none")]
+			module: Option<String>,
+			ts: String,
+			msg: String,
+
+			#[serde(flatten)]
+			#[serde(with = "kv::source::as_map")]
+			kvs: &'kv dyn kv::Source,
+		}
+
+		log.format(move |mut buf, record| {
+			let rec = Record {
+				level: record.level().as_str(),
+				module: if let Self::Trace = self {
+					record.module_path().map(|m| m.to_string())
+				} else {
+					None
+				},
+				ts: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+				msg: record.args().to_string(),
+				kvs: record.key_values(),
+			};
+
+			serde_json::to_writer(&mut buf, &rec)?;
+			writeln!(buf)?;
+			Ok(())
+		});
+
+		log.try_init()?;
+
+		Ok(())
 	}
 }
 
@@ -246,7 +299,7 @@ type Prep = (IpNetwork, NetworkInterface, MacAddr, bool, Args);
 fn prep() -> Result<Option<Prep>> {
 	let (ip, args) = {
 		let mut args: Args = argh::from_env();
-		femme::with_level(args.log.into());
+		args.log.install()?;
 
 		if args.source {
 			println!(
