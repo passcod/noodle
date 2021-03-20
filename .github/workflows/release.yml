@@ -35,9 +35,9 @@ jobs:
           strip $bin
           mv $bin "$dst/"
           mv README.md COPYRIGHT LICENSE-MIT LICENSE-APACHE "$dst/"
-          tar caf "$dst.tar.xz" "$dst"
-      - uses: softprops/action-gh-release@v1
-        with:
-          files: *.tar.xz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tar cavf "$dst.tar.xz" "$dst"
+      #- uses: softprops/action-gh-release@v1
+      #  with:
+      #    files: *.tar.xz
+      #  env:
+      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
