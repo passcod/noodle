@@ -435,7 +435,6 @@ async fn main() -> Result<()> {
 					let mut eth = MutableEthernetPacket::new(&mut eth_buf)
 						.ok_or(eyre!("failed to create eth packet"))?;
 
-					let broadcast = MacAddr::broadcast();
 					eth.set_source(mac);
 					eth.set_destination(args.target);
 					eth.set_ethertype(EtherTypes::Arp);
@@ -444,7 +443,7 @@ async fn main() -> Result<()> {
 					info!("sending arp packet", {
 						n: n,
 						src: as_display!(mac),
-						dst: as_display!(broadcast),
+						dst: as_display!(args.target),
 						op: if args.arp_reply { "reply" } else { "request" },
 						hw: "ethernet",
 						hw_addr: as_display!(mac),
