@@ -414,14 +414,15 @@ async fn run((ip, interface, mac, ip_managed, args): Prep) -> Result<()> {
 
 				loop {
 					let pkt = rx.next()?;
-					let eth =
-						EthernetPacket::new(pkt).ok_or_else(|| eyre!("eth packet buffer too small"))?;
+					let eth = EthernetPacket::new(pkt)
+						.ok_or_else(|| eyre!("eth packet buffer too small"))?;
 					if eth.get_ethertype() != EtherTypes::Arp {
 						continue;
 					}
 
 					let pay = eth.payload();
-					let arp = ArpPacket::new(pay).ok_or_else(|| eyre!("arp packet buffer too small"))?;
+					let arp =
+						ArpPacket::new(pay).ok_or_else(|| eyre!("arp packet buffer too small"))?;
 
 					let op = match arp.get_operation() {
 						ArpOperations::Reply => String::from("reply"),
@@ -560,7 +561,7 @@ async fn run((ip, interface, mac, ip_managed, args): Prep) -> Result<()> {
 	}
 
 	if ip_managed {
-		info!("removing ip from interface", { ip: &ip as &dyn std::fmt::Display, interface: interface.index });
+		info!("removing ip from interface", { ip: as_display!(ip), interface: interface.index });
 		let mut addrlist = nlah.get().execute();
 		while let Some(addr) = addrlist.try_next().await? {
 			if addr.header.index != interface.index {
