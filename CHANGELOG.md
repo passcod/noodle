@@ -9,6 +9,7 @@
 - Don't crash if the IP exists on the interface already.
 - Add `--die-if-ip-exists`.
 - Add `--remove-pre-existing-ip`.
+- Add warning if a /32 is used.
 
 ## v1.0.1 (2021-03-21)
 

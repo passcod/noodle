@@ -62,7 +62,7 @@ struct Args {
 	#[argh(option)]
 	interface: Option<String>,
 
-	/// ip (optionally with subnet, defaults to /32) to announce (required)
+	/// ip in address/subnet format to announce (required)
 	#[argh(option)]
 	ip: Option<IpNetwork>,
 
@@ -364,6 +364,15 @@ fn prep() -> Result<Option<Prep>> {
 			(None, None) => return Err(eyre!("missing required options: --interface, --ip")),
 		}
 	};
+
+	let one_prefix = match ip {
+		IpNetwork::V4(_) => 32,
+		IpNetwork::V6(_) => 128,
+	};
+
+	if ip.prefix() == one_prefix {
+		warn!("subnet is /{}: this is almost certainly NOT what you want to do", one_prefix);
+	}
 
 	let interface = interfaces()
 		.into_iter()
