@@ -210,15 +210,16 @@ Mandatory options:
 
 Other options:
 
-- `--mac ADDRESS`: override the MAC address IP is announced for (default=read from interface)
-- `--target ADDRESS`: override the MAC address packets are sent to (default=broadcast)
+- `--mac ADDRESS`: override the MAC address IP is announced for (default=read from interface).
+- `--target ADDRESS`: override the MAC address packets are sent to (default=broadcast).
 - `--log LEVEL`: specify the log level (default=info). All logs are JSON.
 - `--interval DURATION` in seconds (default=10): how often to announce.
 - `--delay DURATION` in seconds (default=0): delay the first announce.
 - `--watch-delay DURATION` in seconds (default=0): delay before watching for competings.
 - `--jitter DURATION` in seconds (default=1): add jitter to each interval up to this value.
-- `--arp-reply`: use ARP reply instead of ARP request as announcement type
-- `--unmanaged-ip`: leave the interface alone (don't add/remove the ip)
+- `--arp-reply`: use ARP reply instead of ARP request as announcement type.
+- `--unmanaged-ip`: leave the interface alone (don't add/remove the ip).
+- `--die-if-ip-exists`: exit with status 1 if the IP already exists on the interface.
 - `--watch BEHAVIOUR`: control the competing announcement watcher:
   * `fail` (default): exit with status 1 if we see an announcement for this
     IP by another MAC address

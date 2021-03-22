@@ -40,7 +40,7 @@ use pnet::{
 };
 use pulse::Signal;
 use rand::{rngs::OsRng, Rng};
-use rtnetlink::{packet::rtnl::address::nlas::Nla, AddressHandle};
+use rtnetlink::{packet::{AddressMessage, rtnl::address::nlas::Nla}, AddressHandle};
 use serde::Serialize;
 
 macro_rules! as_display {
@@ -103,7 +103,7 @@ struct Args {
 	/// control what the competing announcement watcher does when it sees ARP for the same IP but
 	/// from a different MAC (default=fail)
 	///
-	/// [fail: exit with code=17]
+	/// [fail: exit with code=1]
 	/// [quit: exit with code=0]
 	/// [log: don't exit, only log]
 	/// [no: don't watch]
@@ -121,6 +121,10 @@ struct Args {
 	/// don't add/remove the ip to/from the interface
 	#[argh(switch)]
 	unmanaged_ip: bool,
+
+	/// exit with code=1 if the ip exists on the interface already
+	#[argh(switch)]
+	die_if_ip_exists: bool,
 
 	/// shorthand for `--delay=0 --jitter=0 --count=1 --watch=no`
 	#[argh(switch)]
@@ -277,8 +281,9 @@ fn jittered(base: Duration, jitter: Duration) -> Duration {
 	match (base.as_secs(), jitter.as_millis()) {
 		(0, 0) => Duration::from_secs(0),
 		(_, 0) => base,
-		(_, j) =>
-			base + Duration::from_millis(OsRng::default().gen_range(0..u64::try_from(j).unwrap())),
+		(_, j) => {
+			base + Duration::from_millis(OsRng::default().gen_range(0..u64::try_from(j).unwrap()))
+		}
 	}
 }
 
@@ -406,10 +411,19 @@ async fn run((ip, interface, mac, ip_managed, args): Prep) -> Result<()> {
 		debug!("starting netlink connection");
 		spawn(nlconn);
 
-		info!("adding ip to interface", { ip: as_display!(ip), interface: interface.index });
-		nlah.add(interface.index, ip.ip(), ip.prefix())
-			.execute()
-			.await?;
+		info!("checking if interface has ip", { ip: as_display!(ip), interface: interface.index });
+		if find_addr_for_ip(&nlah, interface.clone(), ip).await?.is_some() {
+			if args.die_if_ip_exists {
+				return Err(eyre!("ip exists on interface, abort"));
+			} else {
+				warn!("existing ip on the interface");
+			}
+		} else {
+			info!("adding ip to interface", { ip: as_display!(ip), interface: interface.index });
+			nlah.add(interface.index, ip.ip(), ip.prefix())
+				.execute()
+				.await?;
+		}
 	}
 
 	let (listener, blaster) = match ip {
@@ -429,7 +443,9 @@ async fn run((ip, interface, mac, ip_managed, args): Prep) -> Result<()> {
 					return Ok(());
 				}
 
-				watch_signal.wait().map_err(|_| eyre!("failed to wait on watch signal"))?;
+				watch_signal
+					.wait()
+					.map_err(|_| eyre!("failed to wait on watch signal"))?;
 				wait(watch_delay);
 
 				info!("watching for competing arp announcements");
@@ -588,33 +604,45 @@ async fn run((ip, interface, mac, ip_managed, args): Prep) -> Result<()> {
 
 	if ip_managed {
 		info!("removing ip from interface", { ip: as_display!(ip), interface: interface.index });
-		let mut addrlist = nlah.get().execute();
-		while let Some(addr) = addrlist.try_next().await? {
-			if addr.header.index != interface.index {
-				continue;
-			}
-
-			let addrbytes = match addr.nlas.iter().find(|n| matches!(n, Nla::Address(_))) {
-				Some(Nla::Address(a)) => a,
-				_ => continue,
-			};
-
-			match ip {
-				IpNetwork::V4(ip4) => {
-					match <[u8; 4]>::try_from(addrbytes.clone()).map(Ipv4Addr::from) {
-						Ok(ar) if ar == ip4.ip() => nlah.del(addr).execute().await?,
-						_ => continue,
-					};
-				}
-				IpNetwork::V6(ip6) => {
-					match <[u8; 16]>::try_from(addrbytes.clone()).map(Ipv6Addr::from) {
-						Ok(ar) if ar == ip6.ip() => nlah.del(addr).execute().await?,
-						_ => continue,
-					};
-				}
-			};
+		if let Some(addr) = find_addr_for_ip(&nlah, interface, ip).await? {
+			nlah.del(addr).execute().await?;
 		}
 	}
 
 	Ok(())
+}
+
+async fn find_addr_for_ip(
+	nlah: &AddressHandle,
+	interface: NetworkInterface,
+	ip: IpNetwork,
+) -> Result<Option<AddressMessage>> {
+	let mut addrlist = nlah.get().execute();
+	while let Some(addr) = addrlist.try_next().await? {
+		if addr.header.index != interface.index {
+			continue;
+		}
+
+		let addrbytes = match addr.nlas.iter().find(|n| matches!(n, Nla::Address(_))) {
+			Some(Nla::Address(a)) => a,
+			_ => continue,
+		};
+
+		match ip {
+			IpNetwork::V4(ip4) => {
+				match <[u8; 4]>::try_from(addrbytes.clone()).map(Ipv4Addr::from) {
+					Ok(ar) if ar == ip4.ip() => return Ok(Some(addr)),
+					_ => continue,
+				};
+			}
+			IpNetwork::V6(ip6) => {
+				match <[u8; 16]>::try_from(addrbytes.clone()).map(Ipv6Addr::from) {
+					Ok(ar) if ar == ip6.ip() => return Ok(Some(addr)),
+					_ => continue,
+				};
+			}
+		};
+	}
+
+	Ok(None)
 }
