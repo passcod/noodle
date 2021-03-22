@@ -1,6 +1,6 @@
 # Changelog
 
-## next (minor)
+## v1.1.0
 
 - Don't apply jitter to delays.
 - Add `--watch-delay` option.
