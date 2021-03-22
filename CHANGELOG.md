@@ -8,6 +8,7 @@
 - Wait until the first announce is sent before starting the competing announce watcher.
 - Don't crash if the IP exists on the interface already.
 - Add `--die-if-ip-exists`.
+- Add `--remove-pre-existing-ip`.
 
 ## v1.0.1 (2021-03-21)
 

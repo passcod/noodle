@@ -220,6 +220,7 @@ Other options:
 - `--arp-reply`: use ARP reply instead of ARP request as announcement type.
 - `--unmanaged-ip`: leave the interface alone (don't add/remove the ip).
 - `--die-if-ip-exists`: exit with status 1 if the IP already exists on the interface.
+- `--remove-pre-existing-ip`: remove the IP even if we didn't add it ourselves.
 - `--watch BEHAVIOUR`: control the competing announcement watcher:
   * `fail` (default): exit with status 1 if we see an announcement for this
     IP by another MAC address

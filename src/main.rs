@@ -126,6 +126,10 @@ struct Args {
 	#[argh(switch)]
 	die_if_ip_exists: bool,
 
+	/// remove the ip from the interface on exit even when we didn't add it ourselves
+	#[argh(switch)]
+	remove_pre_existing_ip: bool,
+
 	/// shorthand for `--delay=0 --jitter=0 --count=1 --watch=no`
 	#[argh(switch)]
 	once: bool,
@@ -383,7 +387,7 @@ fn prep() -> Result<Option<Prep>> {
 	Ok(Some((ip, interface, mac, !args.unmanaged_ip, args)))
 }
 
-async fn run((ip, interface, mac, ip_managed, args): Prep) -> Result<()> {
+async fn run((ip, interface, mac, mut ip_managed, args): Prep) -> Result<()> {
 	let (mut tx, mut rx) = match datachannel(
 		&interface,
 		Config {
@@ -417,6 +421,9 @@ async fn run((ip, interface, mac, ip_managed, args): Prep) -> Result<()> {
 				return Err(eyre!("ip exists on interface, abort"));
 			} else {
 				warn!("existing ip on the interface");
+				if !args.remove_pre_existing_ip {
+					ip_managed = false;
+				}
 			}
 		} else {
 			info!("adding ip to interface", { ip: as_display!(ip), interface: interface.index });
