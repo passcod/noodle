@@ -87,7 +87,7 @@ struct Args {
 	#[argh(option, from_str_fn(str_to_secs), default = "Duration::from_secs(0)")]
 	delay: Duration,
 
-	/// add some random [0 - value in seconds] jitter to delay and interval (default=1)
+	/// add some random [0 - value in seconds] jitter to each interval (default=1)
 	#[argh(option, from_str_fn(str_to_secs), default = "Duration::from_secs(1)")]
 	jitter: Duration,
 
@@ -257,18 +257,19 @@ impl LogLevel {
 	}
 }
 
-fn wait(base: Duration, jitter: Duration) {
-	let slep = match (base.as_secs(), jitter.as_millis()) {
-		(0, 0) => None,
-		(_, 0) => Some(base),
-		(_, j) => Some(
-			base + Duration::from_millis(OsRng::default().gen_range(0..u64::try_from(j).unwrap())),
-		),
-	};
-
-	if let Some(d) = slep {
+fn wait(d: Duration) {
+	if d.as_millis() > 0 {
 		debug!("sleeping {:?}", d);
 		sleep(d);
+	}
+}
+
+fn jittered(base: Duration, jitter: Duration) -> Duration {
+	match (base.as_secs(), jitter.as_millis()) {
+		(0, 0) => Duration::from_secs(0),
+		(_, 0) => base,
+		(_, j) =>
+			base + Duration::from_millis(OsRng::default().gen_range(0..u64::try_from(j).unwrap())),
 	}
 }
 
@@ -482,7 +483,7 @@ async fn run((ip, interface, mac, ip_managed, args): Prep) -> Result<()> {
 			});
 
 			let blaster = spawn_blocking(move || -> Result<()> {
-				wait(args.delay, args.jitter);
+				wait(args.delay);
 
 				let mut n = 0_usize;
 				loop {
@@ -541,7 +542,7 @@ async fn run((ip, interface, mac, ip_managed, args): Prep) -> Result<()> {
 						return Ok(());
 					}
 
-					wait(args.interval, args.jitter);
+					wait(jittered(args.interval, args.jitter));
 				}
 			});
 

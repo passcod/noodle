@@ -1,5 +1,9 @@
 # Changelog
 
+## next (minor)
+
+- Don't apply jitter to delays.
+
 ## v1.0.1 (2021-03-21)
 
 - Handle runtime (as opposed to startup time) errors with logging rather than eyre.
