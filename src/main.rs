@@ -444,7 +444,7 @@ async fn run((ip, interface, mac, mut ip_managed, args): Prep) -> Result<()> {
 
 	let (listener, blaster) = match ip {
 		IpNetwork::V4(_) => {
-			let (watch_signal, mut watch_pulse) = if args.watch_immediately || args.count == 0 {
+			let (watch_signal, mut watch_pulse) = if args.watch_immediately {
 				(Signal::pulsed(), None)
 			} else {
 				let (s, p) = Signal::new();

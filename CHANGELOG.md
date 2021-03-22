@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.1.1 (2021-03-22)
+
+- Fix bug where watcher would always start immediately if `--count` wasn't provided.
+
 ## v1.1.0 (2021-03-22)
 
 - Don't apply jitter to delays.
