@@ -4,6 +4,8 @@
 
 - Don't apply jitter to delays.
 - Add `--watch-delay` option.
+- Add `--watch-immediately` option.
+- Wait until the first announce is sent before starting the competing announce watcher.
 
 ## v1.0.1 (2021-03-21)
 

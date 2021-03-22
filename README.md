@@ -225,6 +225,7 @@ Other options:
   * `quit`: exit with status 0 instead
   * `log`: don't exit, only log it
   * `no`: don't watch
+- `--watch-immediately`: don't wait until the first announce is sent to start watching.
 - `--count N` (default=0/disabled): only announce this many times.
 - `--once`: shorthand for `--count 1  --delay 0  --jitter 0  --watch no`.
 

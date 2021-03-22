@@ -38,6 +38,7 @@ use pnet::{
 	},
 	util::MacAddr,
 };
+use pulse::Signal;
 use rand::{rngs::OsRng, Rng};
 use rtnetlink::{packet::rtnl::address::nlas::Nla, AddressHandle};
 use serde::Serialize;
@@ -108,6 +109,10 @@ struct Args {
 	/// [no: don't watch]
 	#[argh(option, default = "Default::default()")]
 	watch: Watch,
+
+	/// start the watcher immediately instead of waiting until the first announcement
+	#[argh(switch)]
+	watch_immediately: bool,
 
 	/// use arp reply instead of request announcements
 	#[argh(switch)]
@@ -409,13 +414,22 @@ async fn run((ip, interface, mac, ip_managed, args): Prep) -> Result<()> {
 
 	let (listener, blaster) = match ip {
 		IpNetwork::V4(_) => {
+			let (watch_signal, mut watch_pulse) = if args.watch_immediately || args.count == 0 {
+				(Signal::pulsed(), None)
+			} else {
+				let (s, p) = Signal::new();
+				(s, Some(p))
+			};
+
 			let watch = args.watch;
 			let watch_delay = args.watch_delay;
+
 			let listener = spawn_blocking(move || -> Result<()> {
 				if let Watch::No = watch {
 					return Ok(());
 				}
 
+				watch_signal.wait().map_err(|_| eyre!("failed to wait on watch signal"))?;
 				wait(watch_delay);
 
 				info!("watching for competing arp announcements");
@@ -547,6 +561,10 @@ async fn run((ip, interface, mac, ip_managed, args): Prep) -> Result<()> {
 					n = n.saturating_add(1);
 					if args.count > 0 && n >= args.count {
 						return Ok(());
+					}
+
+					if let Some(pulse) = watch_pulse.take() {
+						pulse.pulse();
 					}
 
 					wait(jittered(args.interval, args.jitter));

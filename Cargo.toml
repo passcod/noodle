@@ -32,6 +32,7 @@ pnet = "0.27.2"
 rand = "0.8.3"
 serde = { version = "1.0.124", features = ["derive"] }
 serde_json = "1.0.64"
+pulse = "0.5.3"
 
 # waits on: https://github.com/little-dude/netlink/issues/149
 [dependencies.rtnetlink]
