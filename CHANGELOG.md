@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.1.0
+## v1.1.0 (2021-03-22)
 
 - Don't apply jitter to delays.
 - Add `--watch-delay` option.
