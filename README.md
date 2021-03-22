@@ -195,7 +195,7 @@ You can also compile from the repo as usual.
 
 ## Use
 
-Requires sudo or the correct capability (TBC).
+Requires sudo or the `NET_ADMIN` capability.
 
 Minimal command:
 
