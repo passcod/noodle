@@ -3,6 +3,7 @@
 ## next (minor)
 
 - Don't apply jitter to delays.
+- Add `--watch-delay` option.
 
 ## v1.0.1 (2021-03-21)
 

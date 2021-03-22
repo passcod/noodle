@@ -87,6 +87,10 @@ struct Args {
 	#[argh(option, from_str_fn(str_to_secs), default = "Duration::from_secs(0)")]
 	delay: Duration,
 
+	/// delay in seconds before watching for competing announcements (default=0/disabled)
+	#[argh(option, from_str_fn(str_to_secs), default = "Duration::from_secs(0)")]
+	watch_delay: Duration,
+
 	/// add some random [0 - value in seconds] jitter to each interval (default=1)
 	#[argh(option, from_str_fn(str_to_secs), default = "Duration::from_secs(1)")]
 	jitter: Duration,
@@ -406,10 +410,13 @@ async fn run((ip, interface, mac, ip_managed, args): Prep) -> Result<()> {
 	let (listener, blaster) = match ip {
 		IpNetwork::V4(_) => {
 			let watch = args.watch;
+			let watch_delay = args.watch_delay;
 			let listener = spawn_blocking(move || -> Result<()> {
 				if let Watch::No = watch {
 					return Ok(());
 				}
+
+				wait(watch_delay);
 
 				info!("watching for competing arp announcements");
 

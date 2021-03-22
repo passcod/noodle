@@ -215,6 +215,7 @@ Other options:
 - `--log LEVEL`: specify the log level (default=info). All logs are JSON.
 - `--interval DURATION` in seconds (default=10): how often to announce.
 - `--delay DURATION` in seconds (default=0): delay the first announce.
+- `--watch-delay DURATION` in seconds (default=0): delay before watching for competings.
 - `--jitter DURATION` in seconds (default=1): add jitter to each interval up to this value.
 - `--arp-reply`: use ARP reply instead of ARP request as announcement type
 - `--unmanaged-ip`: leave the interface alone (don't add/remove the ip)
